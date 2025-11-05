@@ -91,7 +91,14 @@ pub async fn run_issue_async_task() -> Result<()> {
             状态: 开启
             链接: [原文链接]
             术语解释: ECS（Entity-Component-System）是一种游戏开发架构，用于管理游戏对象（实体）及其属性（组件）和行为（系统）。内存泄漏是指程序在分配内存后未能释放，导致内存使用不断增加。
-            对于多个issue，可以列出列表。",
+            对于多个issue，可以列出列表。
+
+            最终响应结构：
+                每日Bevy Issue总结
+                    总结日期: 2025年11月5日
+                    统计: 共16个issue，其中Bug报告1个，功能请求2个，文档问题1个，性能优化3个，图形渲染4个，UI系统3个，ECS改进2个。
+                分类总结：按类别列出issue。
+                每个issue的详细总结。",
         ))
     );
     chat_messages.push(MessageRequest::user(&issue_main_message.join("\n")));
