@@ -1,11 +1,19 @@
+use crate::{
+    bots::{
+        deepseek_client::build_deepseek_clienty, github_client::build_github_client,
+        qqbot_client::QQBotClient,
+    },
+    tasks::github_task::{BEVY_REPO, BEYV_OWNER},
+};
 use actix_rt::spawn;
 use anyhow::Result;
 use chrono::{Days, Local};
-use deepseek_api::{CompletionsRequestBuilder, RequestBuilder, request::MessageRequest};
+use deepseek_api::{
+    CompletionsRequestBuilder, RequestBuilder, request::MessageRequest,
+    response::ModelType::DeepSeekReasoner,
+};
 use log::{error, info};
 use tokio_schedule::{Job, every};
-
-use crate::{bots::{deepseek_client::build_deepseek_clienty, github_client::build_github_client, qqbot_client::QQBotClient}, tasks::github_task::{BEVY_REPO, BEYV_OWNER}};
 
 pub fn get_new_commits() -> Result<()> {
     info!("开始定时抓取pr任务");
@@ -22,7 +30,6 @@ pub fn get_new_commits() -> Result<()> {
                 .repos(BEYV_OWNER, BEVY_REPO)
                 .list_commits()
                 .since(since)
-                // .since(since)
                 .send()
                 .await
                 .unwrap();
@@ -32,7 +39,8 @@ pub fn get_new_commits() -> Result<()> {
 
             let mut all_issue = issue_list.into_iter().map(|issue| {
                 MessageRequest::user(
-                    &format!("Commit Message内容: {:?}，发布者名称：{:?}, 文件更改列表：{:?}, 原文链接: {}", issue.commit.message, issue.author, issue.files, issue.url)
+                    &format!("Commit Message内容: {:?}，发布者名称：{:?}, 文件更改列表：{:?}, 原文链接: {}",
+                    issue.commit.message, issue.author, issue.files, issue.html_url)
                 )
             }).collect::<Vec<_>>();
 
@@ -43,7 +51,7 @@ pub fn get_new_commits() -> Result<()> {
             );
 
             let res = CompletionsRequestBuilder::new(&all_issue)
-                .use_model(deepseek_api::response::ModelType::DeepSeekReasoner)
+                .use_model(DeepSeekReasoner)
                 .stream(false)
                 .do_request(&deepseek_client)
                 .await;

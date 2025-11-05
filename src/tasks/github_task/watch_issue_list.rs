@@ -1,7 +1,9 @@
 use actix_rt::spawn;
 use anyhow::Result;
 use chrono::{Days, Local};
-use deepseek_api::{CompletionsRequestBuilder, RequestBuilder, request::MessageRequest};
+use deepseek_api::{
+    CompletionsRequestBuilder, RequestBuilder, request::MessageRequest, response::AssistantMessage,
+};
 use log::{error, info};
 use tokio_schedule::{Job, every};
 
@@ -49,15 +51,10 @@ pub async fn run_issue_async_task() -> Result<()> {
         .send()
         .await?;
 
-    // info!("获取到了: {:?}", issue_list);
-
-    // 发送到AI进行总结
-    let deepseek_client = build_deepseek_clienty()?;
-
-    let mut all_issue = issue_list
+    let issue_main_message = issue_list
         .into_iter()
         .map(|issue| {
-            MessageRequest::user(&format!(
+            format!(
                 "标题: {}, 内容: {:?}，发布者名称：{:?}, 时间UTC: {}, 状态: {:?}， 原文链接: {}",
                 issue.title,
                 issue.body,
@@ -65,23 +62,47 @@ pub async fn run_issue_async_task() -> Result<()> {
                 issue.created_at,
                 issue.state,
                 issue.html_url.to_string()
-            ))
+            )
         })
         .collect::<Vec<_>>();
 
-    info!("共计获取到 {} 个issue", all_issue.len());
+    // 发送到AI进行总结
+    let deepseek_client = build_deepseek_clienty()?;
 
-    all_issue.push(
-        MessageRequest::user(
-            "上面是每日的issue内容，是关于Bevy游戏引擎的，结合Bevy游戏引擎的背景，对上面的issue列表使用中文进行总结，请一定要使用Markdown格式进行回复所有的内容，附上issue的创建时间，对于一些涉及引擎，图形学的专业术语，可以简单的附上解释，解释该功能的效果或者作用或者原理（根据术语来决定如何解释），记得原封不动的附上原文的链接地址，让用户可以点击查看。直接回复总结的内容即可，省略开头和结尾的客套话。"
-        )
+    let mut chat_messages = vec![];
+    chat_messages.push(
+        MessageRequest::Assistant(AssistantMessage::new(
+            r"你是一个Bevy游戏引擎的社区宣传工作者，你需要根据用户提供的每日的issue列表信息进行分类总结，总结中需要包含issue的标题，内容，发布者名称，时间UTC，状态，原文链接，并进行翻译，对其中的游戏引擎底层原理、图形学等专业知识（术语）进行恰当的解释。
+            示例issue：
+            假设一个issue：
+            
+            标题: Fix memory leak in ECS system
+            内容: There is a memory leak when entities are despawned in the ECS. This causes the game to crash after prolonged play.
+            发布者: john_doe
+            时间: 2023-10-05T12:00:00Z
+            状态: open
+            链接: https://github.com/bevyengine/bevy/issues/1234
+            总结：
+            分类: Bug报告
+            标题: 修复ECS系统中的内存泄漏（翻译）
+            内容: 当实体在ECS中被销毁时，存在内存泄漏问题，导致游戏在长时间运行后崩溃。（翻译和总结）
+            发布者: john_doe
+            时间: 2023-10-05 12:00:00 UTC
+            状态: 开启
+            链接: [原文链接]
+            术语解释: ECS（Entity-Component-System）是一种游戏开发架构，用于管理游戏对象（实体）及其属性（组件）和行为（系统）。内存泄漏是指程序在分配内存后未能释放，导致内存使用不断增加。
+            对于多个issue，可以列出列表。",
+        ))
     );
+    chat_messages.push(MessageRequest::user(&issue_main_message.join("\n")));
 
     info!("开始请求AI总结");
 
-    let res = CompletionsRequestBuilder::new(&all_issue)
+    let res = CompletionsRequestBuilder::new(&chat_messages)
         .use_model(deepseek_api::response::ModelType::DeepSeekReasoner)
         .stream(false)
+        .max_tokens(8192)
+        .unwrap()
         .do_request(&deepseek_client)
         .await;
 
