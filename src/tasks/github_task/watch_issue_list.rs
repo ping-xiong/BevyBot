@@ -1,0 +1,165 @@
+use actix_rt::spawn;
+use anyhow::Result;
+use chrono::{Days, Local};
+use deepseek_api::{CompletionsRequestBuilder, RequestBuilder, request::MessageRequest};
+use log::{error, info};
+use tokio_schedule::{Job, every};
+
+use crate::{
+    bots::{
+        deepseek_client::build_deepseek_clienty, github_client::build_github_client,
+        qqbot_client::QQBotClient,
+    },
+    tasks::github_task::{BEVY_REPO, BEYV_OWNER},
+};
+
+pub fn get_new_issuse() -> Result<()> {
+    info!("开始定时抓取issue任务");
+
+    // let mut now = Local::now().to_utc();
+
+    let every_day_task = every(1).day().at(13, 00, 00).perform(|| async {
+        match run_issue_async_task().await {
+            Ok(_) => (),
+            Err(err) => {
+                error!("{err:?}");
+            }
+        }
+    });
+
+    spawn(every_day_task);
+
+    Ok(())
+}
+
+pub async fn run_issue_async_task() -> Result<()> {
+    info!("开始任务");
+
+    let spider = build_github_client()?;
+
+    let since = Local::now()
+        .to_utc()
+        .checked_sub_days(Days::new(1))
+        .unwrap();
+
+    let issue_list = spider
+        .issues(BEYV_OWNER, BEVY_REPO)
+        .list()
+        .since(since)
+        .send()
+        .await?;
+
+    // info!("获取到了: {:?}", issue_list);
+
+    // 发送到AI进行总结
+    let deepseek_client = build_deepseek_clienty()?;
+
+    let mut all_issue = issue_list
+        .into_iter()
+        .map(|issue| {
+            MessageRequest::user(&format!(
+                "标题: {}, 内容: {:?}，发布者名称：{:?}, 时间UTC: {}, 状态: {:?}， 原文链接: {}",
+                issue.title,
+                issue.body,
+                issue.user.name,
+                issue.created_at,
+                issue.state,
+                issue.html_url.to_string()
+            ))
+        })
+        .collect::<Vec<_>>();
+
+    info!("共计获取到 {} 个issue", all_issue.len());
+
+    all_issue.push(
+        MessageRequest::user(
+            "上面是每日的issue内容，是关于Bevy游戏引擎的，结合Bevy游戏引擎的背景，对上面的issue列表使用中文进行总结，请一定要使用Markdown格式进行回复所有的内容，附上issue的创建时间，对于一些涉及引擎，图形学的专业术语，可以简单的附上解释，解释该功能的效果或者作用或者原理（根据术语来决定如何解释），记得原封不动的附上原文的链接地址，让用户可以点击查看。直接回复总结的内容即可，省略开头和结尾的客套话。"
+        )
+    );
+
+    info!("开始请求AI总结");
+
+    let res = CompletionsRequestBuilder::new(&all_issue)
+        .use_model(deepseek_api::response::ModelType::DeepSeekReasoner)
+        .stream(false)
+        .do_request(&deepseek_client)
+        .await;
+
+    info!("AI总结完成");
+
+    if let Ok(res) = res {
+        let response = res.must_response();
+        info!("{:?}", response);
+        if let Some(choice) = response.choices.first() {
+            if let Some(message) = &choice.message {
+                if !message.content.is_empty() {
+                    info!("开始发布帖子");
+                    // 发送到频道
+                    let qq_client = QQBotClient::new_with_default(false).await?;
+                    qq_client
+                        .send_issue_summary("Issues", &message.content)
+                        .await?;
+                    info!("帖子发布完成");
+                } else {
+                    error!("文本为空");
+                }
+            } else {
+                error!("获取text失败");
+            }
+        } else {
+            error!("获取choices失败");
+        }
+    } else {
+        error!("请求失败");
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use dotenvy::dotenv;
+
+    use crate::tasks::github_task::{
+        BEVY_REPO, BEYV_OWNER, watch_issue_list::run_issue_async_task,
+    };
+
+    #[tokio::test]
+    async fn test_issue_list() {
+        println!("开始测试issue列表获取");
+        dotenv().ok();
+
+        let token = std::env::var("GITHUB_PERSON_TOKEN").unwrap();
+
+        println!("测试Token： {}", token);
+
+        let spider = octocrab::Octocrab::builder()
+            .personal_token(token)
+            .build()
+            .unwrap();
+
+        let issue_list = spider
+            .issues(BEYV_OWNER, BEVY_REPO)
+            .list()
+            // .since(since)
+            .page(0_u32)
+            .per_page(10)
+            .send()
+            .await
+            .unwrap();
+
+        println!("Total Issue: {:?}", issue_list.total_count);
+
+        for issue in issue_list {
+            println!("{}", issue.title);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_task() {
+        dotenv().ok();
+        env_logger::init();
+
+        run_issue_async_task().await.unwrap();
+    }
+}
