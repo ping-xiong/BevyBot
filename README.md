@@ -7,7 +7,7 @@
 
 ### 环境配置
 
-复制 `.env.example` 文件，创建 `.env` 文件，并填写GITHUB_PERSON_TOKEN和GITHUB_PERSON_TOKEN等必要的环境变量。
+复制 `.env.example` 文件，创建 `.env` 文件，并填写`GITHUB_PERSON_TOKEN`和`GITHUB_PERSON_TOKEN`等必要的环境变量。
 
 ### 自动编译
 
