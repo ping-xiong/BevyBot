@@ -118,30 +118,30 @@ pub async fn run_issue_async_task() -> Result<()> {
 
     info!("AI总结完成");
 
-    if let Ok(res) = res {
-        let response = res.must_response();
-        info!("{:?}", response);
-        if let Some(choice) = response.choices.first() {
-            if let Some(message) = &choice.message {
-                if !message.content.is_empty() {
-                    info!("开始发布帖子");
-                    // 发送到频道
-                    let qq_client = QQBotClient::new_with_default(false).await?;
-                    qq_client
-                        .send_issue_summary("Issues", &message.content)
-                        .await?;
-                    info!("帖子发布完成");
-                } else {
-                    error!("文本为空");
-                }
-            } else {
-                error!("获取text失败");
-            }
-        } else {
-            error!("获取choices失败");
-        }
-    } else {
+    let Ok(res) = res else {
         error!("请求失败");
+        return Ok(());
+    };
+    let response = res.must_response();
+    info!("{:?}", response);
+    let Some(choice) = response.choices.first() else {
+        error!("获取choices失败");
+        return Ok(());
+    };
+    let Some(message) = &choice.message else {
+        error!("获取message失败");
+        return Ok(());
+    };
+    if !message.content.is_empty() {
+        info!("开始发布帖子");
+        // 发送到频道
+        let qq_client = QQBotClient::new_with_default(false).await?;
+        qq_client
+            .send_issue_summary("Issues", &message.content)
+            .await?;
+        info!("帖子发布完成");
+    } else {
+        error!("文本为空");
     }
 
     Ok(())
