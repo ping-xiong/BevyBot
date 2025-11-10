@@ -78,7 +78,7 @@ pub async fn run_pr_task() -> Result<()> {
     if !text.is_empty() {
         // 发送到频道
         let qq_client = QQBotClient::new_with_default(false).await?;
-        qq_client.send_commit_summary("PRs", &text).await?;
+        qq_client.send_pr_summary("PRs", &text).await?;
     }
 
     Ok(())
