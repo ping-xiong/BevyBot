@@ -1,20 +1,20 @@
 use std::{env, time::Duration};
 
 use actix_cors::Cors;
-use actix_web::{App, HttpResponse, HttpServer, web};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use api::{admin::admin, client::client};
 use dotenvy::dotenv;
 use migration::{
-    Migrator, MigratorTrait,
     sea_orm::{ConnectOptions, Database, DatabaseConnection},
+    Migrator, MigratorTrait,
 };
 use redis::Client;
 
 mod api;
-mod bots;
-mod state;
-mod tasks;
 mod util;
+mod tasks;
+mod state;
+mod bots;
 
 pub type Result<T> = crate::util::error::Result<T>;
 pub type HttpResult = Result<HttpResponse>;
@@ -25,16 +25,11 @@ pub struct AppState {
     redis: Client,
 }
 
+
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
 
-use crate::tasks::{
-    bsky_task::watch_merge_train_feed::spawn_merge_train_task,
-    github_task::{
-        watch_issue_list::get_new_issues, watch_milestones::spawn_milestone_task,
-        watch_pr::get_new_commits,
-    },
-};
+use crate::tasks::{bsky_task::watch_merge_train_feed::spawn_merge_train_task, github_task::{watch_commits::get_new_commits, watch_issue_list::get_new_issues, watch_milestones::spawn_milestone_task, watch_pr::get_new_prs}};
 
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
@@ -78,6 +73,7 @@ async fn main() -> std::io::Result<()> {
     get_new_commits().unwrap();
     spawn_milestone_task(app_state.clone()).unwrap();
     spawn_merge_train_task(app_state.clone());
+    get_new_prs().unwrap();
 
     HttpServer::new(move || {
         let cors = Cors::permissive();

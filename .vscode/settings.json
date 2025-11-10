@@ -1,18 +1,9 @@
 {
     "cSpell.words": [
         "actix",
-        "bevymergetrain",
-        "bsky",
         "chrono",
         "clienty",
         "deepseek",
-        "dotenv",
-        "dotenvy",
-        "Jemalloc",
-        "jemallocator",
-        "msvc",
-        "qqbot",
-        "sqlx",
-        "tikv"
+        "qqbot"
     ]
 }

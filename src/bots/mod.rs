@@ -9,6 +9,9 @@ pub mod deepseek_client;
 pub mod github_client;
 pub mod bsky_client;
 
+
+const REQUEST_TIME_OUT_SEC: u64 = 60 * 30;
+
 // 定义机器人的事件处理器
 struct MyBot;
 

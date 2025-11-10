@@ -2,8 +2,7 @@ use actix_rt::spawn;
 use anyhow::Result;
 use chrono::{Days, Local};
 use deepseek_api::{
-    CompletionsRequestBuilder, RequestBuilder,
-    request::{MessageRequest, SystemMessageRequest},
+    CompletionsRequestBuilder, RequestBuilder, request::MessageRequest, response::AssistantMessage,
 };
 use log::{error, info};
 use tokio_schedule::{Job, every};
@@ -52,6 +51,10 @@ pub async fn run_issue_async_task() -> Result<()> {
         .send()
         .await?;
 
+    if issue_list.items.is_empty() {
+        anyhow::bail!("今日Issues为空");
+    }
+
     let issue_main_message = issue_list
         .into_iter()
         .map(|issue| {
@@ -62,7 +65,7 @@ pub async fn run_issue_async_task() -> Result<()> {
                 issue.user.name,
                 issue.created_at,
                 issue.state,
-                issue.html_url
+                issue.html_url.to_string()
             )
         })
         .collect::<Vec<_>>();
@@ -74,8 +77,9 @@ pub async fn run_issue_async_task() -> Result<()> {
     // 发送到AI进行总结
     let deepseek_client = build_deepseek_client()?;
 
-    let chat_messages = vec![
-        MessageRequest::System(SystemMessageRequest::new(
+    let mut chat_messages = vec![];
+    chat_messages.push(
+        MessageRequest::Assistant(AssistantMessage::new(
             r"你是一个Bevy游戏引擎的社区宣传工作者，你需要根据用户提供的每日的issue列表信息进行分类总结，总结中需要包含issue的标题，内容，发布者名称，时间UTC，状态，原文链接，并进行翻译，对其中的游戏引擎底层原理、图形学等专业知识（术语）进行恰当的解释，挑选比较难的，常用的、都比较了解的略过。
             示例issue：
             假设一个issue：
@@ -93,7 +97,7 @@ pub async fn run_issue_async_task() -> Result<()> {
             发布者: john_doe
             时间: 2023-10-05 12:00:00 UTC
             状态: 开启
-            链接:  [GitHub Issue #xxxx]
+            链接:  [GitHub Issue #xxxx](原文链接)
             术语解释: ECS（Entity-Component-System）是一种游戏开发架构，用于管理游戏对象（实体）及其属性（组件）和行为（系统）。内存泄漏是指程序在分配内存后未能释放，导致内存使用不断增加。
             对于多个issue，可以列出列表。
 
@@ -102,9 +106,9 @@ pub async fn run_issue_async_task() -> Result<()> {
                     总结日期: {{}}年{{}}月{{}}日
                     统计: 共{{}}个issue,每类多少个。
                 详细报告：以类别为一个标题开始罗列每个issue的详细信息。分类可以加上Unicode图标。",
-        )),
-        MessageRequest::user(&issue_main_message.join("\n")),
-    ];
+        ))
+    );
+    chat_messages.push(MessageRequest::user(&issue_main_message.join("\n")));
 
     info!("开始请求AI总结");
 
