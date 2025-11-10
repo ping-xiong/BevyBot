@@ -29,7 +29,7 @@ pub struct AppState {
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
 
-use crate::tasks::{bsky_task::watch_mergetrain_feed::spawn_mergetrain_task, github_task::{watch_commits::get_new_commits, watch_issue_list::get_new_issuse, watch_milestones::spawn_milestone_task, watch_pr::get_new_prs}};
+use crate::tasks::{bsky_task::watch_merge_train_feed::spawn_merge_train_task, github_task::{watch_commits::get_new_commits, watch_issue_list::get_new_issues, watch_milestones::spawn_milestone_task, watch_pr::get_new_prs}};
 
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
@@ -69,10 +69,10 @@ async fn main() -> std::io::Result<()> {
     let web_app_state = web::Data::new(app_state.clone());
 
     // 异步任务
-    get_new_issuse().unwrap();
+    get_new_issues().unwrap();
     get_new_commits().unwrap();
     spawn_milestone_task(app_state.clone()).unwrap();
-    spawn_mergetrain_task(app_state.clone());
+    spawn_merge_train_task(app_state.clone());
     get_new_prs().unwrap();
 
     HttpServer::new(move || {

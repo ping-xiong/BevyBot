@@ -15,7 +15,7 @@ use crate::{
     tasks::github_task::{BEVY_OWNER, BEVY_REPO},
 };
 
-pub fn get_new_issuse() -> Result<()> {
+pub fn get_new_issues() -> Result<()> {
     info!("开始定时抓取issue任务");
 
     // let mut now = Local::now().to_utc();

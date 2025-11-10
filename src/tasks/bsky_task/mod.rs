@@ -1,5 +1,5 @@
 
-pub mod watch_mergetrain_feed;
+pub mod watch_merge_train_feed;
 pub mod feed_data;
 pub mod post_data;
 
