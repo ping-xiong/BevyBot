@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, time::Duration};
 
 use anyhow::Result;
 use reqwest::{Client, ClientBuilder};
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::json;
 use url::Url;
 
-use crate::{AppState, util::cache::{get, put_ttl}};
+use crate::{AppState, bots::REQUEST_TIME_OUT_SEC, util::cache::{get, put_ttl}};
 
 const ACCESS_TOKEN_KEY_NAME: &str = "QQ_BOT_ACCESS_TOKEN";
 
@@ -132,6 +132,7 @@ pub async fn build_qq_bot_client(
     Ok(
         ClientBuilder::new()
             .default_headers(headers)
+            .timeout(Duration::from_secs(REQUEST_TIME_OUT_SEC))
             .build()?
     )
 }

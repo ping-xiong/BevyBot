@@ -1,9 +1,11 @@
-use std::env;
+use std::{env, time::Duration};
 
 use reqwest::{Client, ClientBuilder};
 use serde::de::DeserializeOwned;
 use url::Url;
 use anyhow::Result;
+
+use crate::bots::REQUEST_TIME_OUT_SEC;
 
 pub struct BskyClient {
     pub client: Client,
@@ -14,6 +16,7 @@ pub struct BskyClient {
 impl BskyClient {
     pub fn new() -> Self {
         let client = ClientBuilder::new()
+            .timeout(Duration::from_secs(REQUEST_TIME_OUT_SEC))
             .build()
             .unwrap();
 
