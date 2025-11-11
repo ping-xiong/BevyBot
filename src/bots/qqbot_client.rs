@@ -216,4 +216,42 @@ mod tests {
 
         info!("{:?}", res);
     }
+
+    #[tokio::test]
+    async fn send_video_thread() {
+        dotenv().ok();
+        env_logger::init();
+
+        // 测试视频地址
+        let video_url = "https://www.w3school.com.cn/example/html5/mov_bbb.mp4";
+
+        let qq_client = QQBotClient::new_with_default(true).await.unwrap();
+
+
+
+        let video_json = json!(
+            {
+                "paragraphs": [{
+                    "elems": [
+                        {
+                            "video": {
+                                "third_url": video_url
+                            },
+                            "type": 3
+                        }
+                    ],
+                    "props": {
+                        "alignment": 0
+                    }
+                }]
+            }
+        );
+        let video_json_text = serde_json::to_string(&video_json).unwrap();
+
+        qq_client.send_any_thread(json!({
+            "title": "测试视频",
+            "content": video_json_text,
+            "format": 4
+        }), &env::var("BEVY_NEWS_CHANNEL_ID").unwrap()).await.unwrap();
+    }
 }
